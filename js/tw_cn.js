@@ -1,5 +1,4 @@
-/* eslint-disable no-undef */
-document.addEventListener('DOMContentLoaded', function () {
+(function () {
   const translate = GLOBAL_CONFIG.translate
   const snackbarData = GLOBAL_CONFIG.Snackbar
   const defaultEncoding = translate.defaultEncoding // 網站默認語言，1: 繁體中文, 2: 簡體中文
@@ -9,9 +8,9 @@ document.addEventListener('DOMContentLoaded', function () {
   let currentEncoding = defaultEncoding
   const targetEncodingCookie = 'translate-chn-cht'
   let targetEncoding =
-  saveToLocal.get(targetEncodingCookie) === undefined
+  Cookies.get(targetEncodingCookie) === undefined
     ? defaultEncoding
-    : Number(saveToLocal.get('translate-chn-cht'))
+    : Number(Cookies.get(targetEncodingCookie))
   let translateButtonObject
   const isSnackbar = GLOBAL_CONFIG.Snackbar !== undefined
 
@@ -48,16 +47,16 @@ document.addEventListener('DOMContentLoaded', function () {
       currentEncoding = 1
       targetEncoding = 2
       translateButtonObject.innerHTML = msgToTraditionalChinese
-      saveToLocal.set(targetEncodingCookie, targetEncoding, 2)
+      Cookies.set(targetEncodingCookie, targetEncoding, 2)
       translateBody()
-      if (isSnackbar) btf.snackbarShow(snackbarData.cht_to_chs)
+      if (isSnackbar) snackbarShow(snackbarData.cht_to_chs)
     } else if (targetEncoding === 2) {
       currentEncoding = 2
       targetEncoding = 1
       translateButtonObject.innerHTML = msgToSimplifiedChinese
-      saveToLocal.set(targetEncodingCookie, targetEncoding, 2)
+      Cookies.set(targetEncodingCookie, targetEncoding, 2)
       translateBody()
-      if (isSnackbar) btf.snackbarShow(snackbarData.chs_to_cht)
+      if (isSnackbar) snackbarShow(snackbarData.chs_to_cht)
     }
   }
   function JTPYStr () {
@@ -96,4 +95,4 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   translateInitialization()
   document.addEventListener('pjax:complete', translateInitialization)
-})
+})()
