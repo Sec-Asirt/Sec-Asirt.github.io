@@ -1,0 +1,366 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Windows脱壳————基础 | Mr.Hu</title><meta name="description" content="知识点回顾1、PE文件的Magic code(魔数、幻数)是什么？  ​    MZ头、PE头 2、PE文件中文件头的信息有哪些？ ​    运行平台、时间戳、PE文件属性、区段数量、扩展头的大小 3、PE文件中扩展头的信息有哪些？ ​    EP的RVA、ImageBase(400000)、代码段起始地址、数据段起始地址 数据目录表、数据目录表项数量、文件对齐、内存对齐、映像总大小 4、 PE文"><meta name="keywords" content="脱壳"><meta name="author" content="胡先森"><meta name="copyright" content="胡先森"><meta name="format-detection" content="telephone=no"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="http://yoursite.com/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/"><meta http-equiv="Cache-Control" content="no-transform"><meta http-equiv="Cache-Control" content="no-siteapp"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//fonts.googleapis.com" crossorigin="crossorigin"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><meta name="yandex-verification" content="{&quot;theme_color&quot;:{&quot;enable&quot;:true,&quot;main&quot;:&quot;#49B1F5&quot;,&quot;paginator&quot;:&quot;#00c4b6&quot;,&quot;button_hover&quot;:&quot;#FF7242&quot;,&quot;text_selection&quot;:&quot;#00c4b6&quot;,&quot;link_color&quot;:&quot;#99a9bf&quot;,&quot;meta_color&quot;:&quot;#858585&quot;,&quot;hr_color&quot;:&quot;#A4D8FA&quot;,&quot;code_foreground&quot;:&quot;#F47466&quot;,&quot;code_background&quot;:&quot;rgba(27, 31, 35, .05)&quot;,&quot;toc_color&quot;:&quot;#00c4b6&quot;,&quot;blockquote_padding_color&quot;:&quot;#49b1f5&quot;,&quot;blockquote_background_color&quot;:&quot;#49b1f5&quot;}}"/><meta property="og:type" content="article"><meta property="og:title" content="Windows脱壳————基础"><meta property="og:url" content="http://yoursite.com/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/"><meta property="og:site_name" content="Mr.Hu"><meta property="og:description" content="知识点回顾1、PE文件的Magic code(魔数、幻数)是什么？  ​    MZ头、PE头 2、PE文件中文件头的信息有哪些？ ​    运行平台、时间戳、PE文件属性、区段数量、扩展头的大小 3、PE文件中扩展头的信息有哪些？ ​    EP的RVA、ImageBase(400000)、代码段起始地址、数据段起始地址 数据目录表、数据目录表项数量、文件对齐、内存对齐、映像总大小 4、 PE文"><meta property="og:image" content="http://yoursite.com/img/2.jpg"><meta property="article:published_time" content="2020-12-25T05:57:28.447Z"><meta property="article:modified_time" content="2021-01-13T01:24:42.519Z"><meta name="twitter:card" content="summary"><script>var activateDarkMode = function () {
+  document.documentElement.setAttribute('data-theme', 'dark')
+  if (document.querySelector('meta[name="theme-color"]') !== null) {
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#000')
+  }
+}
+var activateLightMode = function () {
+  document.documentElement.setAttribute('data-theme', 'light')
+  if (document.querySelector('meta[name="theme-color"]') !== null) {
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#fff')
+  }
+}
+
+var getCookies = function (name) {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop().split(';').shift()
+}
+
+var autoChangeMode = 'false'
+var t = getCookies('theme')
+if (autoChangeMode === '1') {
+  var isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+  var isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+  var isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+  var hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+  if (t === undefined) {
+    if (isLightMode) activateLightMode()
+    else if (isDarkMode) activateDarkMode()
+    else if (isNotSpecified || hasNoSupport) {
+      console.log('You specified no preference for a color scheme or your browser does not support it. I Schedule dark mode during night time.')
+      var now = new Date()
+      var hour = now.getHours()
+      var isNight = hour <= 6 || hour >= 18
+      isNight ? activateDarkMode() : activateLightMode()
+    }
+    window.matchMedia('(prefers-color-scheme: dark)').addListener(function (e) {
+      if (Cookies.get('theme') === undefined) {
+        e.matches ? activateDarkMode() : activateLightMode()
+      }
+    })
+  } else if (t === 'light') activateLightMode()
+  else activateDarkMode()
+} else if (autoChangeMode === '2') {
+  now = new Date()
+  hour = now.getHours()
+  isNight = hour <= 6 || hour >= 18
+  if (t === undefined) isNight ? activateDarkMode() : activateLightMode()
+  else if (t === 'light') activateLightMode()
+  else activateDarkMode()
+} else {
+  if (t === 'dark') activateDarkMode()
+  else if (t === 'light') activateLightMode()
+}</script><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Titillium+Web&amp;display=swap"><script>var GLOBAL_CONFIG = { 
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"search.xml","languages":{"hits_empty":"找不到您查询的内容：${query}"}},
+  translate: {"defaultEncoding":1,"translateDelay":0,"msgToTraditionalChinese":"繁","msgToSimplifiedChinese":"簡"},
+  noticeOutdate: undefined,
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  bookmark: {
+    message_prev: '按',
+    message_next: '键将本页加入书签'
+  },
+  runtime_unit: '天',
+  runtime: true,
+  copyright: undefined,
+  ClickShowText: {"text":"❤富强❤,❤民主❤,❤和谐❤,❤友善❤,❤敬业❤,❤文明❤,❤自由❤,❤平等❤,❤公正❤,❤法治❤,❤爱国❤,❤诚信❤","fontSize":"15px"},
+  medium_zoom: false,
+  fancybox: true,
+  Snackbar: undefined,
+  justifiedGallery: {
+    js: 'https://cdn.jsdelivr.net/npm/justifiedGallery/dist/js/jquery.justifiedGallery.min.js',
+    css: 'https://cdn.jsdelivr.net/npm/justifiedGallery/dist/css/justifiedGallery.min.css'
+  },
+  baiduPush: false,
+  highlightCopy: true,
+  highlightLang: true,
+  isPhotoFigcaption: false,
+  islazyload: true,
+  isanchor: false    
+}</script><script id="config_change">var GLOBAL_CONFIG_SITE = { 
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isSidebar: true,
+  postUpdate: '2021-01-13 09:24:42'
+}</script><noscript><style>
+#nav {
+  opacity: 1
+}
+.justified-gallery img {
+  opacity: 1
+}
+</style></noscript><link rel="stylesheet" href="/css/background.css"><meta name="generator" content="Hexo 5.2.0"></head><body><div id="mobile-sidebar"><div id="menu_mask"></div><div id="mobile-sidebar-menus"><div class="mobile_author_icon"><img class="avatar-img" data-lazy-src="/img/avatar.jpg" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="mobile_post_data"><div class="mobile_data_item is-center"><div class="mobile_data_link"><a href="/archives/"><div class="headline">文章</div><div class="length_num">29</div></a></div></div><div class="mobile_data_item is-center">      <div class="mobile_data_link"><a href="/tags/"><div class="headline">标签</div><div class="length_num">32</div></a></div></div><div class="mobile_data_item is-center">     <div class="mobile_data_link"><a href="/categories/"><div class="headline">分类</div><div class="length_num">10</div></a></div></div></div><hr/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/projects/clock/"><i class="fa-fw fas fa-home"></i><span> 主页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-bookmark"></i><span> 时光轴</span></a></div><div class="menus_item"><a class="site-page" href="/tools/"><i class="fa-fw fas fa-archive"></i><span> 工具</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="javascript:void(0);"><i class="fa-fw fas fa-list"></i><span> 放松</span><i class="fas fa-chevron-down expand"></i></a><ul class="menus_item_child"><li><a class="site-page" href="/music/"><i class="fa-fw fas fa-music"></i><span> 音乐</span></a></li><li><a class="site-page" href="/movies/"><i class="fa-fw fas fa-video"></i><span> 学习</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/projects/photo/"><i class="fa-fw fas fa-images"></i><span> 照片墙</span></a></div><div class="menus_item"><a class="site-page" href="javascript:void(0);"><i class="fa-fw fas fa-film"></i><span> 游戏</span><i class="fas fa-chevron-down expand"></i></a><ul class="menus_item_child"><li><a class="site-page" href="/projects/game1/"><i class="fa-fw fas fa-heart"></i><span> 保卫星球</span></a></li><li><a class="site-page" href="/projects/game2/"><i class="fa-fw fas fa-heart"></i><span> 飞字快打</span></a></li><li><a class="site-page" href="/projects/game3/"><i class="fa-fw fas fa-heart"></i><span> 俄罗斯方块</span></a></li><li><a class="site-page" href="/projects/game4/"><i class="fa-fw fas fa-heart"></i><span> 特效画笔</span></a></li><li><a class="site-page" href="/projects/game5/"><i class="fa-fw fas fa-heart"></i><span> 音速小子</span></a></li><li><a class="site-page" href="/projects/game6/"><i class="fa-fw fas fa-heart"></i><span> 植物大战僵尸</span></a></li><li><a class="site-page" href="/projects/zifuyu/"><i class="fa-fw fas fa-heart"></i><span> 字符雨</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="javascript:void(0);"><i class="fa-fw fas fa-link"></i><span> 链接</span><i class="fas fa-chevron-down expand"></i></a><ul class="menus_item_child"><li><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> 友情链接</span></a></li><li><a class="site-page" href="/projects/link/"><i class="fa-fw fas fa-link"></i><span> 网站导航</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user-circle"></i><span> 留言板</span></a></div></div></div></div><div id="body-wrap"><div id="web_bg" data-type="photo"></div><div id="sidebar"><i class="fas fa-arrow-right on" id="toggle-sidebar"></i><div class="sidebar-toc"><div class="sidebar-toc__title">目录</div><div class="sidebar-toc__progress"><span class="progress-notice">你已经读了</span><span class="progress-num">0</span><span class="progress-percentage">%</span><div class="sidebar-toc__progress-bar">     </div></div><div class="sidebar-toc__content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9%E5%9B%9E%E9%A1%BE"><span class="toc-number">1.</span> <span class="toc-text">知识点回顾</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%89%8B%E5%B7%A5%E5%8A%A0%E5%A3%B3"><span class="toc-number">2.</span> <span class="toc-text">手工加壳</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%B7%E4%BD%93%E6%AD%A5%E9%AA%A4"><span class="toc-number">2.1.</span> <span class="toc-text">具体步骤</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%B7%BB%E5%8A%A0%E5%8C%BA%E6%AE%B5"><span class="toc-number">2.1.1.</span> <span class="toc-text">添加区段</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BF%AE%E6%94%B9OEP%EF%BC%8C%E5%A2%9E%E5%8A%A0OEP%E4%BB%A3%E7%A0%81"><span class="toc-number">2.1.2.</span> <span class="toc-text">修改OEP，增加OEP代码</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8A%A0%E5%AF%86%E4%BB%A3%E7%A0%81%E6%AE%B5"><span class="toc-number">2.1.3.</span> <span class="toc-text">加密代码段</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%A2%9E%E5%8A%A0%E8%A7%A3%E5%AF%86%E4%BB%A3%E7%A0%81"><span class="toc-number">2.1.4.</span> <span class="toc-text">增加解密代码</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E8%84%B1%E5%A3%B3"><span class="toc-number">3.</span> <span class="toc-text">脱壳</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%84%B1%E5%A3%B3%E7%9A%84%E7%9B%AE%E7%9A%84%EF%BC%9A"><span class="toc-number">3.1.</span> <span class="toc-text">脱壳的目的：</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%84%B1%E5%A3%B3%E7%9A%84%E6%AD%A5%E9%AA%A4%EF%BC%9A"><span class="toc-number">3.2.</span> <span class="toc-text">脱壳的步骤：</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AF%BC%E5%85%A5%E8%A1%A8%E5%92%8CIAT"><span class="toc-number">3.3.</span> <span class="toc-text">导入表和IAT</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%84%B1%E8%87%AA%E5%B7%B1%E5%8A%A0%E7%9A%84%E5%A3%B3"><span class="toc-number">3.4.</span> <span class="toc-text">脱自己加的壳</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%A6%82%E8%BF%B0"><span class="toc-number">4.</span> <span class="toc-text">概述</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%B3%E4%BA%8E%E5%8E%8B%E7%BC%A9%E7%AE%97%E6%B3%95"><span class="toc-number">4.1.</span> <span class="toc-text">关于压缩算法</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%84%B1%E5%A3%B3%E4%B8%89%E6%AD%A5%E6%B3%95"><span class="toc-number">4.2.</span> <span class="toc-text">脱壳三步法</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%84%B1%E5%A3%B3%E4%B8%89%E6%AD%A5%E6%B3%95-%E5%AF%BB%E6%89%BEOEP%E6%8A%80%E5%B7%A7"><span class="toc-number">4.2.1.</span> <span class="toc-text">脱壳三步法-寻找OEP技巧</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E8%84%B1%E5%A3%B3%E7%BB%83%E4%B9%A0"><span class="toc-number">5.</span> <span class="toc-text">脱壳练习</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%A3%B3%E4%BB%A3%E7%A0%81%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%B5%81%E7%A8%8B"><span class="toc-number">5.1.</span> <span class="toc-text">壳代码的基本流程</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%84%B1%E5%A3%B3-0-aspack-exe"><span class="toc-number">5.2.</span> <span class="toc-text">脱壳-0.aspack.exe</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%A3%B3%E4%BB%A3%E7%A0%81%E5%88%86%E6%9E%90"><span class="toc-number">5.2.1.</span> <span class="toc-text">壳代码分析</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1%E3%80%81%E5%A3%B3OEP"><span class="toc-number">5.2.1.1.</span> <span class="toc-text">1、壳OEP</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2%E3%80%81%E5%8A%A0%E8%BD%BD%E5%BF%85%E8%A6%81API"><span class="toc-number">5.2.1.2.</span> <span class="toc-text">2、加载必要API</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3%E3%80%81%E8%A7%A3%E5%AF%86%E8%A7%A3%E5%8E%8B%E7%BC%A9%E4%BB%A3%E7%A0%81"><span class="toc-number">5.2.1.3.</span> <span class="toc-text">3、解密解压缩代码</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4%E3%80%81%E4%BF%AE%E5%A4%8D%E9%87%8D%E5%AE%9A%E4%BD%8D"><span class="toc-number">5.2.1.4.</span> <span class="toc-text">4、修复重定位</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#5%E3%80%81%E5%A1%AB%E5%85%85IAT"><span class="toc-number">5.2.1.5.</span> <span class="toc-text">5、填充IAT</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%84%B1%E5%A3%B3%E5%88%86%E6%9E%90%EF%BC%88aspack-exe-%E9%87%8D%E5%AE%9A%E4%BD%8D%E8%A1%A8%E5%88%86%E6%9E%90%EF%BC%89"><span class="toc-number">5.2.2.</span> <span class="toc-text">脱壳分析（aspack.exe 重定位表分析）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%94%AF%E6%8C%81%E9%87%8D%E5%AE%9A%E4%BD%8D%E7%9A%84%E8%84%B1%E5%A3%B3"><span class="toc-number">5.2.3.</span> <span class="toc-text">支持重定位的脱壳</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%89%BE%E5%88%B0%E5%85%A5%E5%8F%A3%E7%82%B9OEP"><span class="toc-number">5.2.3.1.</span> <span class="toc-text">找到入口点OEP</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E4%BB%8E%E5%86%85%E5%AD%98dump%E5%88%B0%E6%96%87%E4%BB%B6"><span class="toc-number">5.2.3.2.</span> <span class="toc-text">从内存dump到文件</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E4%BF%AE%E5%A4%8DIAT"><span class="toc-number">5.2.3.3.</span> <span class="toc-text">修复IAT</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E4%BF%AE%E5%A4%8D%E9%87%8D%E5%AE%9A%E4%BD%8D"><span class="toc-number">5.2.3.4.</span> <span class="toc-text">修复重定位</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%84%B1%E5%A3%B3-00-exe"><span class="toc-number">5.3.</span> <span class="toc-text">脱壳-00.exe</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%89%BE%E5%88%B0OEP"><span class="toc-number">5.3.1.</span> <span class="toc-text">找到OEP</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Dump"><span class="toc-number">5.3.2.</span> <span class="toc-text">Dump</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BF%AE%E5%A4%8DIAT-1"><span class="toc-number">5.3.3.</span> <span class="toc-text">修复IAT</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BF%AE%E6%94%B900-exe%E5%85%A5%E5%8F%A3%E7%82%B9"><span class="toc-number">5.4.</span> <span class="toc-text">修改00.exe入口点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%84%B1%E5%A3%B3-01-exe"><span class="toc-number">5.5.</span> <span class="toc-text">脱壳-01.exe</span></a></li></ol></li></ol></div></div></div><header class="post-bg" id="page-header" style="background-image: url(/img/2.jpg)"><nav id="nav"><span class="pull-left" id="blog_name"><a class="blog_title" id="site-name" href="/">Mr.Hu</a></span><span class="pull-right menus"><div id="search_button"><a class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/projects/clock/"><i class="fa-fw fas fa-home"></i><span> 主页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-bookmark"></i><span> 时光轴</span></a></div><div class="menus_item"><a class="site-page" href="/tools/"><i class="fa-fw fas fa-archive"></i><span> 工具</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="javascript:void(0);"><i class="fa-fw fas fa-list"></i><span> 放松</span><i class="fas fa-chevron-down expand"></i></a><ul class="menus_item_child"><li><a class="site-page" href="/music/"><i class="fa-fw fas fa-music"></i><span> 音乐</span></a></li><li><a class="site-page" href="/movies/"><i class="fa-fw fas fa-video"></i><span> 学习</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/projects/photo/"><i class="fa-fw fas fa-images"></i><span> 照片墙</span></a></div><div class="menus_item"><a class="site-page" href="javascript:void(0);"><i class="fa-fw fas fa-film"></i><span> 游戏</span><i class="fas fa-chevron-down expand"></i></a><ul class="menus_item_child"><li><a class="site-page" href="/projects/game1/"><i class="fa-fw fas fa-heart"></i><span> 保卫星球</span></a></li><li><a class="site-page" href="/projects/game2/"><i class="fa-fw fas fa-heart"></i><span> 飞字快打</span></a></li><li><a class="site-page" href="/projects/game3/"><i class="fa-fw fas fa-heart"></i><span> 俄罗斯方块</span></a></li><li><a class="site-page" href="/projects/game4/"><i class="fa-fw fas fa-heart"></i><span> 特效画笔</span></a></li><li><a class="site-page" href="/projects/game5/"><i class="fa-fw fas fa-heart"></i><span> 音速小子</span></a></li><li><a class="site-page" href="/projects/game6/"><i class="fa-fw fas fa-heart"></i><span> 植物大战僵尸</span></a></li><li><a class="site-page" href="/projects/zifuyu/"><i class="fa-fw fas fa-heart"></i><span> 字符雨</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="javascript:void(0);"><i class="fa-fw fas fa-link"></i><span> 链接</span><i class="fas fa-chevron-down expand"></i></a><ul class="menus_item_child"><li><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> 友情链接</span></a></li><li><a class="site-page" href="/projects/link/"><i class="fa-fw fas fa-link"></i><span> 网站导航</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-user-circle"></i><span> 留言板</span></a></div></div><span class="toggle-menu close"><a class="site-page"><i class="fas fa-bars fa-fw"></i></a></span></span></nav><div id="post-info"><div id="post-title"><div class="posttitle">Windows脱壳————基础</div></div><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2020-12-25T05:57:28.447Z" title="发表于 2020-12-25 13:57:28">2020-12-25</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2021-01-13T01:24:42.519Z" title="更新于 2021-01-13 09:24:42">2021-01-13</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E9%80%86%E5%90%91%E5%BC%80%E5%8F%91/">逆向开发</a></span></div><div class="meta-secondline"> <span class="post-meta-separator">|</span><span class="post-meta-wordcount"><i class="far fa-file-word fa-fw post-meta-icon"></i><span class="post-meta-label">字数总计:</span><span class="word-count">2.5k</span><span class="post-meta-separator">|</span><i class="far fa-clock fa-fw post-meta-icon"></i><span class="post-meta-label">阅读时长:</span><span>8分钟</span></span><span class="post-meta-separator">|</span><span class="post-meta-pv-cv"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"></span></span></div></div></div></header><main class="layout_post" id="content-inner"><article id="post"><div class="post-content" id="article-container"><h1 id="知识点回顾"><a href="#知识点回顾" class="headerlink" title="知识点回顾"></a>知识点回顾</h1><p>1、PE文件的Magic code(魔数、幻数)是什么？ </p>
+<p>​    MZ头、PE头</p>
+<p>2、PE文件中文件头的信息有哪些？</p>
+<p>​    运行平台、时间戳、PE文件属性、区段数量、扩展头的大小</p>
+<p>3、PE文件中扩展头的信息有哪些？</p>
+<p>​    EP的RVA、ImageBase(400000)、代码段起始地址、数据段起始地址 数据目录表、数据目录表项数量、文件对齐、内存对齐、映像总大小</p>
+<p>4、 PE文件中区段信息有哪些？</p>
+<p>​    区段名称、虚拟地址、虚拟大小、文件偏移、文件大小、区段属性(C0000020、60000020)</p>
+<p>5、PE文件中数据目录表有哪些表？</p>
+<p>​    导出表、导入表、异常表、tls表、资源表、IAT、重定位表</p>
+<p>6、一个进程，三环下有哪些数据结构？</p>
+<p>​    进程环境块(PEB)、线程环境块(TEB)、tls结构</p>
+<p>7、导入表结构体字段有几个，分别是什么？</p>
+<p>​    5个字段</p>
+<p>​    第一个是OrginalFirstThunk,里面是rva,指向的INT，</p>
+<p>​    第二个是时间戳，</p>
+<p>​    第三个是转发机 制用到的ForWarderChain,</p>
+<p>​    第四个是name,rva,dll名称字符串，</p>
+<p>​    第五个是FirstThunk，指向的是 IAT。 INT或IAT在文件中存的是一样的，存的是指向名称字符串的rva或者一个序号</p>
+<h1 id="手工加壳"><a href="#手工加壳" class="headerlink" title="手工加壳"></a>手工加壳</h1><p>目标：将代码段加密，以防止IDA等静态工具分析。</p>
+<p>步骤： </p>
+<ol>
+<li><p>添加一个区段(文件大小、区段数量) </p>
+</li>
+<li><p>将原OEP修改为新区段中的地址 </p>
+</li>
+<li><p>将代码段异或加密 </p>
+</li>
+<li><p>在新区段新OEP处，添加异或解密代码</p>
+</li>
+</ol>
+<p>注意: ① 代码段默认没有可写属性，需要修改。 ② 有随机基址属性的程序会重定位代码，一般我们会去掉这个属性 如果没有去掉，就需要在壳代码中进行重定位</p>
+<h2 id="具体步骤"><a href="#具体步骤" class="headerlink" title="具体步骤"></a>具体步骤</h2><h3 id="添加区段"><a href="#添加区段" class="headerlink" title="添加区段"></a>添加区段</h3><img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/Add1.jpg" title="Mr_Hu">
+
+<p>使用LordPE编辑区段信息</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/Add2.jpg" title="Mr_Hu">
+
+<p>再使用010Editor添加文件数据</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/Add3.jpg" title="Mr_Hu">
+
+<h3 id="修改OEP，增加OEP代码"><a href="#修改OEP，增加OEP代码" class="headerlink" title="修改OEP，增加OEP代码"></a>修改OEP，增加OEP代码</h3><p>原OEP：000011D2 新OEP：17000 修改OEP</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/EditOep1.jpg" title="Mr_Hu">
+
+<p>添加代码</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/EditOep2.jpg" title="Mr_Hu">
+
+<p>通过技巧获取基地址再跳转</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/EditOep3.jpg" title="Mr_Hu">
+
+<p>另一种改法</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/EditOep4.jpg" title="Mr_Hu">
+
+<p>关于代码的演化 </p>
+<p>① 如果直接去掉随机基址，我们可以在新OEP处，直接写代码跳转到原始OEP</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/EditOep5.jpg" title="Mr_Hu">
+
+<p>② 我们可以在新OEP处定义出模块基地址，然后再加上原始OEP RVA</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/EditOep6.jpg" title="Mr_Hu">
+
+<p>③ 可以在新OEP处通过call pop 组合获取当前指令地址，再减去偏移，计算出模块基址</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/EditOep7.jpg" title="Mr_Hu">
+
+<p>以上代码的机器码复制到有随机基址的同一程序同一位置中，同样也是可以正常运行的</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/EditOep8.jpg" title="Mr_Hu">
+
+<h3 id="加密代码段"><a href="#加密代码段" class="headerlink" title="加密代码段"></a>加密代码段</h3><p>代码段信息</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/PasswdCode1.jpg" title="Mr_Hu">
+
+<p>在010Editor中操作代码段</p>
+<p>选中代码段</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/PasswdCode2.jpg" title="Mr_Hu">
+
+<p>异或代码段</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/PasswdCode3.jpg" title="Mr_Hu">
+
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/PasswdCode4.jpg" title="Mr_Hu">
+
+<h3 id="增加解密代码"><a href="#增加解密代码" class="headerlink" title="增加解密代码"></a>增加解密代码</h3><p>由于代码段本身有重定位信息，那么如果加密之后，重定位会出现问题，所以应该去掉随机基址 40 81 -&gt; 00 81</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/PasswdCode5.jpg" title="Mr_Hu">
+
+
+
+<h1 id="脱壳"><a href="#脱壳" class="headerlink" title="脱壳"></a>脱壳</h1><h2 id="脱壳的目的："><a href="#脱壳的目的：" class="headerlink" title="脱壳的目的："></a>脱壳的目的：</h2><ol>
+<li><p>Cracker(破解者) 脱壳、解密、破解 </p>
+</li>
+<li><p>杀毒引擎(脱壳引擎、反病毒虚拟机) 解密、查杀病毒、扫描特征</p>
+</li>
+</ol>
+<h2 id="脱壳的步骤："><a href="#脱壳的步骤：" class="headerlink" title="脱壳的步骤："></a>脱壳的步骤：</h2><ol>
+<li><p>找到原始OEP</p>
+<p> 一般来说，找到原始OEP或者我们跟踪到原始OEP时，程序都会完成解密操作</p>
+</li>
+<li><p>Dump内存到文件</p>
+<p>当可执行文件在内存已经完成解密之后，我们将内存中代码数据转储(dump)到文件，就可以进 行进一步分析。</p>
+</li>
+<li><p>修复文件(常见于修复IAT，重建导入表)</p>
+<p>从内存中转储的内存数据代码有一些与原本文件中的内容是不一致的。比如说IAT表，内存中IAT 表会被初始为函数地址表，而文件中IAT表与INT表内容一致。所以要想让程序正常运行，一般 都需要修复IAT，因为加壳之后程序一般都会自己去处理导入表、IAT以及重定位等。</p>
+</li>
+</ol>
+<h2 id="导入表和IAT"><a href="#导入表和IAT" class="headerlink" title="导入表和IAT"></a>导入表和IAT</h2><img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/ImportTable1.jpg" title="Mr_Hu">
+
+<p>IAT表在文件中保存的是一个RVA数组，每一项指向指向了函数字符串结构</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/ImportTable2.jpg" title="Mr_Hu">
+
+<p>在内存中，这个RVA数组，被修改为函数地址，每一个函数地址就是之前对应的函数字符串的函 数</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/ImportTable3.jpg" title="Mr_Hu">
+
+<p>所以从内存中dump出的文件，必须进行IAT修复或者修复导入表。</p>
+<h2 id="脱自己加的壳"><a href="#脱自己加的壳" class="headerlink" title="脱自己加的壳"></a>脱自己加的壳</h2><ol>
+<li><p>找到原始OEP</p>
+<p>单步跟踪，很容易找到原始OEP</p>
+</li>
+<li><p>Dump内存到文件</p>
+<p>在原始OEP处进行DUMP内存，原因就是这个时候内存没有做太多的初始化</p>
+</li>
+</ol>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/Dump1.jpg" title="Mr_Hu">
+
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/Dump2.jpg" title="Mr_Hu">
+
+<p>3.修复IAT或者修复导入表</p>
+<p>使用ImportREC修复</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/Dump3.jpg" title="Mr_Hu">
+
+<h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><p>脱壳是一项综合技术，结合PE文件格式、汇编指令的分析，调试加密的程序并将其还原的一 个过程。 </p>
+<p>壳一般分为两种，加密壳和压缩壳，里面所使用的技术有，压缩算法、对代码加密、对IAT 加密、对资源加密。 我们从简单入手-压缩壳。</p>
+<h2 id="关于压缩算法"><a href="#关于压缩算法" class="headerlink" title="关于压缩算法"></a>关于压缩算法</h2><ol>
+<li>有损压缩 一个像素点：RGB 红绿蓝 一个图片：(3,4,5),(4,5,3),(5,4,3) 压缩后：(4,4,4),3 </li>
+<li>无损压缩 一个文件：0,0,0,0,0,0,0 压缩后：0,7</li>
+</ol>
+<h2 id="脱壳三步法"><a href="#脱壳三步法" class="headerlink" title="脱壳三步法"></a>脱壳三步法</h2><ol>
+<li>寻找原始OEP </li>
+<li>dump内存到文件 </li>
+<li>修复文件</li>
+</ol>
+<h3 id="脱壳三步法-寻找OEP技巧"><a href="#脱壳三步法-寻找OEP技巧" class="headerlink" title="脱壳三步法-寻找OEP技巧"></a>脱壳三步法-寻找OEP技巧</h3><ol>
+<li><p>堆栈平衡法(ESP定律</p>
+<p>壳代码就像一个函数，进入时会开辟堆栈、保存寄存器环境，退出时会恢复堆栈、恢复 寄存器。所以应该是堆栈平衡的，那我们可以在壳代码操作了堆栈后对堆栈设置访问或 写入断点，然后运行程序，当断点命中的时候，应该就是退出壳代码的时候。在其附近 单步几次，应该就能到达程序的原始OEP。</p>
+</li>
+<li><p>特征定位法</p>
+<p>在我们熟悉的程序中，我们可以使用特征来定位程序原始OEP。特征有几种： ① 二进制特征 比如release版的VS2013是: oep入口特征：E8????????E9 第一个CALL内的特征:5657BF4EE640BBBE0000FFFF3BC7 ② API特征 比如release版的VS2013的第一个API调用是： GetSystemTimeAsFileTime 比如vc6.0的第一个API调用是： GetVersion 比如Delphi程序第一个API调用是： GetModuleHandleA ③编译器特征 IAT调用不同的编译器生成的调用机器码是不一样 vs -》 call [IAT地址] -》 FF15 xx xx xx xx delphi -&gt; jmp [IAT地址] -》 FF25 xx xx xx xx</p>
+</li>
+</ol>
+<h1 id="脱壳练习"><a href="#脱壳练习" class="headerlink" title="脱壳练习"></a>脱壳练习</h1><h2 id="壳代码的基本流程"><a href="#壳代码的基本流程" class="headerlink" title="壳代码的基本流程"></a>壳代码的基本流程</h2><p>① 保存寄存器环境 </p>
+<p>② 加载一些必要的API </p>
+<p>③ 解密代码和数据 </p>
+<p>④ 修复重定位 </p>
+<p>⑤ 填充IAT </p>
+<p>⑥ 恢复寄存器环境</p>
+<h2 id="脱壳-0-aspack-exe"><a href="#脱壳-0-aspack-exe" class="headerlink" title="脱壳-0.aspack.exe"></a>脱壳-0.aspack.exe</h2><h3 id="壳代码分析"><a href="#壳代码分析" class="headerlink" title="壳代码分析"></a>壳代码分析</h3><h4 id="1、壳OEP"><a href="#1、壳OEP" class="headerlink" title="1、壳OEP"></a>1、壳OEP</h4><img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack.jpg" title="Mr_Hu">
+
+<h4 id="2、加载必要API"><a href="#2、加载必要API" class="headerlink" title="2、加载必要API"></a>2、加载必要API</h4><img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack2.jpg" title="Mr_Hu">
+
+<h4 id="3、解密解压缩代码"><a href="#3、解密解压缩代码" class="headerlink" title="3、解密解压缩代码"></a>3、解密解压缩代码</h4><img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack3.jpg" title="Mr_Hu">
+
+<h4 id="4、修复重定位"><a href="#4、修复重定位" class="headerlink" title="4、修复重定位"></a>4、修复重定位</h4><img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack4.jpg" title="Mr_Hu">
+
+<p>修复重定位的公式：</p>
+<p> 重定位表中存储两个有用字段：</p>
+<ol>
+<li>需要重定位的分页地址 </li>
+<li>需要重定位的分页偏移 重定位分为两步： </li>
+<li>计算出 重定位地址，要重定位的地址=模块基地址+分页地址+分页偏移 </li>
+<li>修复要重定位的地址中数据，[要重定位的地址] - 默认模块基地址 + 当前模块基地址</li>
+</ol>
+<h4 id="5、填充IAT"><a href="#5、填充IAT" class="headerlink" title="5、填充IAT"></a>5、填充IAT</h4><p>原理： </p>
+<p>① 从导入表中获取dll名称</p>
+<p> ② 从导入表中的INT，获取函数名称或者序号 </p>
+<p>③ 通过GetModuleHandleA或者LoadLibraryA获取模块基地址、通过GetProcAddress获取函数地址</p>
+<p>④ 将函数地址填充到对应IAT数组中</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">001D726F 03F2 ADD ESI,EDX 								; esi&#x3D;导入表结构</span><br><span class="line">001D7271 8B46 0C MOV EAX,DWORD PTR DS:[ESI+0xC] 		; 获取模块DLL名称RVA</span><br><span class="line">001D7274 85C0 TEST EAX,EAX</span><br><span class="line">001D7276 0F84 0D010000 JE 00_aspac.001D7389</span><br><span class="line">001D727C 03C2 ADD EAX,EDX 								; 加上基地址，字符串VA</span><br><span class="line">001D727E 8BD8 MOV EBX,EAX</span><br><span class="line">001D7280 50 PUSH EAX</span><br><span class="line">001D7281 FF95 A90F0000 CALL DWORD PTR SS:[EBP+0xFA9] 	; 获取模块基地址</span><br><span class="line">001D7287 85C0 TEST EAX,EAX</span><br><span class="line">001D7289 75 07 JNZ SHORT 00_aspac.001D7292</span><br><span class="line">001D728B 53 PUSH EBX</span><br><span class="line">001D728C FF95 AD0F0000 CALL DWORD PTR SS:[EBP+0xFAD]</span><br><span class="line">001D7292 8985 A9050000 MOV DWORD PTR SS:[EBP+0x5A9],EAX ; 保存模块基地址</span><br><span class="line">001D7298 C785 AD050000&gt;MOV DWORD PTR SS:[EBP+0x5AD],0x0</span><br><span class="line">001D72A2 8B95 88040000 MOV EDX,DWORD PTR SS:[EBP+0x488] ; 获取基地址</span><br><span class="line">001D72A8 8B06 MOV EAX,DWORD PTR DS:[ESI] 			; 获取指向OrignalFirstTh</span><br><span class="line">001D72AA 85C0 TEST EAX,EAX</span><br><span class="line">001D72AC 75 03 JNZ SHORT 00_aspac.001D72B1</span><br><span class="line">001D72AE 8B46 10 MOV EAX,DWORD PTR DS:[ESI+0x10]</span><br><span class="line">001D72B1 03C2 ADD EAX,EDX 							; 计算得出 OrignalFirstT</span><br><span class="line">001D72B3 0385 AD050000 ADD EAX,DWORD PTR SS:[EBP+0x5AD] ; 0</span><br><span class="line">001D72B9 8B18 MOV EBX,DWORD PTR DS:[EAX] 			; 获取INT中的数据，即指向</span><br><span class="line">001D72BB 8B7E 10 MOV EDI,DWORD PTR DS:[ESI+0x10] 	; 获取 FirstThunk</span><br><span class="line">001D72BE 03FA ADD EDI,EDX 							; 计算得出 IAT 地址</span><br><span class="line">001D72C0 03BD AD050000 ADD EDI,DWORD PTR SS:[EBP+0x5AD] ; 0</span><br><span class="line">001D72C6 85DB TEST EBX,EBX 							; 判断结束</span><br><span class="line">001D72C8 0F84 A5000000 JE 00_aspac.001D7373</span><br><span class="line">001D72CE F7C3 00000080 TEST EBX,0x80000000 			; 判断是否是序号</span><br><span class="line">001D72D4 75 04 JNZ SHORT 00_aspac.001D72DA</span><br><span class="line">001D72D6 03DA ADD EBX,EDX 							; 指向函数字符串结构&#x3D;INT</span><br><span class="line">001D72D8 43 INC EBX 								; 减去2，跳过字符串结构的</span><br><span class="line">001D72D9 43 INC EBX</span><br><span class="line">001D72DA 53 PUSH EBX 								; 保存寄存器环境</span><br><span class="line">001D72DB 81E3 FFFFFF7F AND EBX,0x7FFFFFFF</span><br><span class="line">001D72E1 53 PUSH EBX 								; 压入字符串或是序号</span><br><span class="line">001D72E2 FFB5 A9050000 PUSH DWORD PTR SS:[EBP+0x5A9]</span><br><span class="line">001D72E8 FF95 A50F0000 CALL DWORD PTR SS:[EBP+0xFA5] ; 获取函数地址</span><br><span class="line">001D72EE 85C0 TEST EAX,EAX</span><br><span class="line">001D72F0 5B POP EBX 									; 恢复寄存器环境</span><br></pre></td></tr></table></figure>
+
+<p>⑤ 修改属性，跳转原始OEP </p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack5.jpg" title="Mr_Hu">
+
+<h3 id="脱壳分析（aspack-exe-重定位表分析）"><a href="#脱壳分析（aspack-exe-重定位表分析）" class="headerlink" title="脱壳分析（aspack.exe 重定位表分析）"></a>脱壳分析（aspack.exe 重定位表分析）</h3><p>根据以上分析，这个壳代码支持重定位，所以最好这个程序脱完后也支持重定位，如果感觉到麻烦可以直接执行到OEP后直接dump即可</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack6.jpg" title="Mr_Hu">
+
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack7.jpg" title="Mr_Hu">
+
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack8.jpg" title="Mr_Hu">
+
+<p>重定位表</p>
+<p>偏移16000 </p>
+<p>大小0xC74 </p>
+<h3 id="支持重定位的脱壳"><a href="#支持重定位的脱壳" class="headerlink" title="支持重定位的脱壳"></a>支持重定位的脱壳</h3><p>首先不能让01257238  66:830E FF   OR WORD PTR DS:[ESI],0xFFFF   这条语句执行，他会让脱壳之后的程序运行找不到重定位表</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack9.jpg" title="Mr_Hu">
+
+<h4 id="找到入口点OEP"><a href="#找到入口点OEP" class="headerlink" title="找到入口点OEP"></a>找到入口点OEP</h4><p>在壳入口处的执行完pushad指令后给esp下硬件访问断点</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack10.jpg" title="Mr_Hu">
+
+<p>进入该入口点后进行dump</p>
+<h4 id="从内存dump到文件"><a href="#从内存dump到文件" class="headerlink" title="从内存dump到文件"></a>从内存dump到文件</h4><img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack11.jpg" title="Mr_Hu">
+
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack12.jpg" title="Mr_Hu">
+
+<h4 id="修复IAT"><a href="#修复IAT" class="headerlink" title="修复IAT"></a>修复IAT</h4><img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack13.jpg" title="Mr_Hu">
+
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack14.jpg" title="Mr_Hu">
+
+<h4 id="修复重定位"><a href="#修复重定位" class="headerlink" title="修复重定位"></a>修复重定位</h4><img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/0.aspack15.jpg" title="Mr_Hu">
+
+<h2 id="脱壳-00-exe"><a href="#脱壳-00-exe" class="headerlink" title="脱壳-00.exe"></a>脱壳-00.exe</h2><h3 id="找到OEP"><a href="#找到OEP" class="headerlink" title="找到OEP"></a>找到OEP</h3><p>一步一步往下跟</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/00.exe1.jpg" title="Mr_Hu">
+
+<h3 id="Dump"><a href="#Dump" class="headerlink" title="Dump"></a>Dump</h3><img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/00.exe2.jpg" title="Mr_Hu">
+
+<h3 id="修复IAT-1"><a href="#修复IAT-1" class="headerlink" title="修复IAT"></a>修复IAT</h3><img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/00.exe3.jpg" title="Mr_Hu">
+
+<h2 id="修改00-exe入口点"><a href="#修改00-exe入口点" class="headerlink" title="修改00.exe入口点"></a>修改00.exe入口点</h2><p>修改00.exe使其支持入口点为0的程序</p>
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/00.exe4.jpg" title="Mr_Hu">
+
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/00.exe5.jpg" title="Mr_Hu">
+
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/00.exe7.jpg" title="Mr_Hu">
+
+<img src= "/img/loading.gif" data-lazy-src="/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/00.exe6.jpg" title="Mr_Hu">
+
+<h2 id="脱壳-01-exe"><a href="#脱壳-01-exe" class="headerlink" title="脱壳-01.exe"></a>脱壳-01.exe</h2></div><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="mailto:undefined">胡先森</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="http://yoursite.com/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/">http://yoursite.com/2020/12/25/Windows%E8%84%B1%E5%A3%B3%E5%9F%BA%E7%A1%80/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="http://yoursite.com" target="_blank">Mr.Hu</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E8%84%B1%E5%A3%B3/">脱壳</a></div><div class="post_share"><div class="social-share" data-image="/img/2.jpg" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js/dist/css/share.min.css"><script src="https://cdn.jsdelivr.net/npm/social-share.js/dist/js/social-share.min.js" defer></script></div></div><div class="post-reward"><div class="reward-button"><i class="fas fa-qrcode"></i> 打赏<div class="reward-main"><ul class="reward-all"><li class="reward-item"><a href="/img/wechat.jpg" target="_blank"><img class="post-qr-code-img" data-lazy-src="/img/wechat.jpg" alt="wechat"/></a><div class="post-qr-code-desc">wechat</div></li><li class="reward-item"><a href="/img/alipay.jpg" target="_blank"><img class="post-qr-code-img" data-lazy-src="/img/alipay.jpg" alt="alipay"/></a><div class="post-qr-code-desc">alipay</div></li></ul></div></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/2020/12/30/%E7%97%85%E6%AF%92%E5%88%86%E6%9E%90-%E7%86%8A%E7%8C%AB%E7%83%A7%E9%A6%99/"><img class="prev-cover" data-lazy-src="/img/Panda.jpg" onerror="onerror=null;src='/img/404.jpg'"><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">病毒分析————熊猫烧香</div></div></a></div><div class="next-post pull-right"><a href="/2020/12/17/%E9%80%86%E5%90%91%E5%BC%80%E5%8F%91%E5%9F%BA%E7%A1%80/"><img class="next-cover" data-lazy-src="/img/17.jpg" onerror="onerror=null;src='/img/404.jpg'"><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">逆向开发————基础</div></div></a></div></nav><hr/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div class="vcomment" id="vcomment"></div></div></div></div></article></main><footer id="footer" style="background-image: url(/img/2.jpg)" data-type="photo"><div id="footer-wrap"><div class="copyright">&copy;2020 - 2021 By 胡先森</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><section id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="font_plus" type="button" title="放大字体"><i class="fas fa-plus"></i></button><button id="font_minus" type="button" title="缩小字体"><i class="fas fa-minus"></i></button><button id="translateLink" type="button" title="简繁转换">简</button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button></div><div id="rightside-config-show"><button id="rightside_config" type="button" title="设置"><i class="fas fa-cog"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><i class="fas fa-arrow-up"></i></button></div></section><div class="search-dialog" id="local-search"><div class="search-dialog__title" id="local-search-title">本地搜索</div><div id="local-input-panel"><div id="local-search-input"><div class="local-search-box"><input class="local-search-box--input" placeholder="搜索文章" type="text"/></div></div></div><hr/><div id="local-search-results"><div id="local-hits"></div><div id="local-stats"><div class="local-search-stats__hr" id="hr"><span>由</span> <a target="_blank" rel="noopener" href="https://github.com/wzpan/hexo-generator-search" style="color:#49B1F5;">hexo-generator-search</a>
+ <span>提供支持</span></div></div></div><span class="search-close-button"><i class="fas fa-times"></i></span></div><div id="search-mask"></div><div><script src="https://cdn.jsdelivr.net/npm/jquery@latest/dist/jquery.min.js"></script><script src="/js/utils.js"></script><script src="/js/main.js"></script><script src="/js/tw_cn.js"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.js"></script><script src="https://cdn.jsdelivr.net/npm/instant.page/instantpage.min.js" type="module" defer></script><script src="https://cdn.jsdelivr.net/npm/vanilla-lazyload/dist/lazyload.iife.min.js" async></script><script src="/js/search/local-search.js"></script><div class="js-pjax"><script>if (document.getElementsByClassName('mermaid').length) {
+  if (window.mermaidJsLoad) mermaid.init()
+  else {
+    $.getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js', function () {
+      window.mermaidJsLoad = true
+      mermaid.initialize({
+        theme: 'default',
+      })
+      false && mermaid.init()
+    })
+  }
+}</script><script>function loadValine () {
+  function initValine () {
+    window.valine = new Valine({
+      el: '#vcomment',
+      appId: 'Eo4Vh3u0nKU2EUIpOMidpb6L-gzGzoHsz',
+      appKey: 'RIFmwqkX4dT5EpJghF6o6DWE',
+      placeholder: 'Please leave your footprints',
+      avatar: 'monsterid',
+      meta: 'nick,mail,link'.split(','),
+      pageSize: '10',
+      lang: 'zh-CN',
+      recordIP: false,
+      serverURLs: 'https://eo4vh3u0.lc-cn-n1-shared.com',
+      emojiCDN: '',
+      emojiMaps: "",
+      enableQQ: false,
+      path: window.location.pathname,
+    });
+    if ('nick,mail') { valine.config.requiredFields= 'nick,mail'.split(',') }
+  }
+
+  if (typeof Valine === 'function') initValine() 
+  else $.getScript('https://cdn.jsdelivr.net/npm/valine/dist/Valine.min.js', initValine)
+}
+
+if ('Valine' === 'Valine' || !false) {
+  if (false) loadComment(document.querySelector('#vcomment'),loadValine)
+  else setTimeout(() => loadValine(), 0)
+} else {
+  function loadOtherComment () {
+    loadValine()
+  }
+}</script><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div><style type="text/css">#toggle-sidebar {bottom: 80px}</style><div class="aplayer no-destroy" data-id="7322622901" data-server="tencent" data-type="playlist" data-fixed="true" data-mini="true" data-listFolded="false" data-order="random" data-preload="none" data-autoplay="false" muted></div><script src="/js/third-party/activate-power-mode.js"></script><script>POWERMODE.colorful = true;
+POWERMODE.shake = true;
+document.body.addEventListener('input', POWERMODE);
+</script><script src="/js/third-party/ClickShowText.js" async="async"></script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.css"><script src="https://cdn.jsdelivr.net/npm/aplayer/dist/APlayer.min.js"></script><script src="https://cdn.jsdelivr.net/gh/metowolf/MetingJS@1.2/dist/Meting.min.js"></script></div></body></html><!-- 雪花特效 -->
+<script type="text/javascript" src="\js\snow.js"></script>
